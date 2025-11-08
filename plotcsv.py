@@ -2,6 +2,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 import pandas as pd
+import math
 
 def read_points_from_csv(csv_filename):
     """Read points from CSV file with x,y coordinates in units using pandas"""
@@ -97,7 +98,7 @@ def create_grid_with_points(csv_filename, units_per_mm, pdf_filename="grid_with_
 
 def draw_grid_with_unit_labels(c, x_offset, y_offset, grid_width, grid_height, 
                              min_x, max_x, min_y, max_y, units_per_mm, scale):
-    """Draw the millimeter grid with unit labels"""
+    """Draw the millimeter grid with unit labels covering entire axes"""
     # Set light grey color for thin lines
     c.setStrokeColorRGB(0.8, 0.8, 0.8)
     c.setLineWidth(0.2)
@@ -108,7 +109,7 @@ def draw_grid_with_unit_labels(c, x_offset, y_offset, grid_width, grid_height,
     margin_x = (grid_width - data_width_mm) / 2
     margin_y = (grid_height - data_height_mm) / 2
     
-    # Draw vertical lines and labels
+    # Draw vertical lines
     for x in range(int(grid_width / mm) + 1):
         x_pos = x_offset + x * mm
         # Every 10th line is thicker
@@ -120,7 +121,7 @@ def draw_grid_with_unit_labels(c, x_offset, y_offset, grid_width, grid_height,
             c.setLineWidth(0.2)
         c.line(x_pos, y_offset, x_pos, y_offset + grid_height)
     
-    # Draw horizontal lines and labels
+    # Draw horizontal lines
     for y in range(int(grid_height / mm) + 1):
         y_pos = y_offset + y * mm
         # Every 10th line is thicker
@@ -132,25 +133,54 @@ def draw_grid_with_unit_labels(c, x_offset, y_offset, grid_width, grid_height,
             c.setLineWidth(0.2)
         c.line(x_offset, y_pos, x_offset + grid_width, y_pos)
     
-    # Add unit labels for x-axis (bottom)
+    # Add unit labels for entire x-axis (bottom)
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 8)
     
-    # Calculate unit positions for major grid lines (every 10mm)
-    for mm_pos in range(0, int(grid_width / mm) + 1, 10):
-        if mm_pos >= margin_x and mm_pos <= (grid_width - margin_x):
-            # Convert mm position to unit value
-            unit_value = min_x + ((mm_pos - margin_x) / scale) * units_per_mm
-            x_pos = x_offset + mm_pos * mm
-            c.drawString(x_pos - 8, y_offset - 12, f"{unit_value:.0f}")
+    # Calculate the unit step that corresponds to 10mm grid lines
+    unit_step_x = (10 * units_per_mm) / scale
     
-    # Add unit labels for y-axis (left)
+    # Find the starting unit value for the left edge
+    start_unit_x = min_x - (margin_x / scale) * units_per_mm
+    # Round to the nearest multiple of unit_step_x for clean labels
+    start_unit_x = math.floor(start_unit_x / unit_step_x) * unit_step_x
+    
+    # Label every 10mm position along the entire x-axis
+    for mm_pos in range(0, int(grid_width / mm) + 1, 10):
+        # Calculate the unit value at this millimeter position
+        unit_value = start_unit_x + (mm_pos / scale) * units_per_mm
+        x_pos = x_offset + mm_pos * mm
+        
+        # Format the label (use integers if step is integer, otherwise decimals)
+        if unit_step_x.is_integer():
+            label = f"{int(unit_value)}"
+        else:
+            label = f"{unit_value:.1f}"
+        
+        c.drawString(x_pos - 8, y_offset - 12, label)
+    
+    # Add unit labels for entire y-axis (left)
+    # Calculate the unit step that corresponds to 10mm grid lines
+    unit_step_y = (10 * units_per_mm) / scale
+    
+    # Find the starting unit value for the bottom edge
+    start_unit_y = min_y - (margin_y / scale) * units_per_mm
+    # Round to the nearest multiple of unit_step_y for clean labels
+    start_unit_y = math.floor(start_unit_y / unit_step_y) * unit_step_y
+    
+    # Label every 10mm position along the entire y-axis
     for mm_pos in range(0, int(grid_height / mm) + 1, 10):
-        if mm_pos >= margin_y and mm_pos <= (grid_height - margin_y):
-            # Convert mm position to unit value
-            unit_value = min_y + ((mm_pos - margin_y) / scale) * units_per_mm
-            y_pos = y_offset + mm_pos * mm
-            c.drawString(x_offset - 25, y_pos - 3, f"{unit_value:.0f}")
+        # Calculate the unit value at this millimeter position
+        unit_value = start_unit_y + (mm_pos / scale) * units_per_mm
+        y_pos = y_offset + mm_pos * mm
+        
+        # Format the label (use integers if step is integer, otherwise decimals)
+        if unit_step_y.is_integer():
+            label = f"{int(unit_value)}"
+        else:
+            label = f"{unit_value:.1f}"
+        
+        c.drawString(x_offset - 25, y_pos - 3, label)
 
 def draw_grid(c, x_offset, y_offset, grid_width, grid_height):
     """Draw the millimeter grid without unit labels (fallback)"""
@@ -223,36 +253,38 @@ def plot_points_with_units(c, points, x_offset, y_offset, grid_width, grid_heigh
         # Draw circle
         c.circle(x_pdf, y_pdf, circle_radius, fill=1, stroke=1)
 
-def create_sample_csv_with_negative(filename="points_with_negative.csv"):
-    """Create a sample CSV file with negative values"""
-    # Create sample data with negative values
+def create_sample_csv_with_large_range(filename="points_large_range.csv"):
+    """Create a sample CSV file with large range like -50 to -4"""
+    # Create sample data with large negative range
     sample_data = [
-        [-50, -30],
-        [-25, 40],
-        [0, -10],
-        [25, 60],
-        [50, -20],
-        [75, 80],
-        [100, 10],
-        [-40, 70],
-        [90, -40],
-        [-10, -50]
+        [-50, -40],
+        [-45, -35],
+        [-40, -30],
+        [-35, -25],
+        [-30, -20],
+        [-25, -15],
+        [-20, -10],
+        [-15, -5],
+        [-10, -4],
+        [-5, -8]
     ]
     
     df = pd.DataFrame(sample_data)
     df.to_csv(filename, index=False, header=False)
-    print(f"Sample CSV with negative values created: {filename}")
+    print(f"Sample CSV with large range created: {filename}")
     
     # Display the CSV content for verification
     print("CSV content:")
     print(df.to_string(header=False, index=False))
+    print(f"X range: {df[0].min()} to {df[0].max()}")
+    print(f"Y range: {df[1].min()} to {df[1].max()}")
 
 if __name__ == "__main__":
     # Install required packages: 
     # pip install reportlab pandas
     
-    # Create a sample CSV file with negative values for testing
-    create_sample_csv_with_negative("sample_points_negative.csv")
+    # Create a sample CSV file with large range for testing
+    # create_sample_csv_with_large_range("sample_points_large_range.csv")
     
     # Create PDF with points from CSV using unit conversion
     # Example: 10 units per millimeter
