@@ -24,14 +24,13 @@ class Scale:
     def next(self):    
         
         snew = Scale(self.n+1,self.m)
-        snewl = snew.l
         
         for p in range(-self.m,floor((self.n+1)/log(5,2))+1):
             q = ceil(p*log(5,2))-1
             
             proposed_s = Scale(self.n-q,self.m+p)
             
-            if (proposed_s.l < snewl):
+            if (proposed_s.l < snew.l):
                 snew = proposed_s
         
         return snew
