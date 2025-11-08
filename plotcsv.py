@@ -4,10 +4,9 @@ from reportlab.lib.units import mm
 import pandas as pd
 
 def read_points_from_csv(csv_filename):
-    """Read points from CSV file with x,y coordinates in mm using pandas"""
+    """Read points from CSV file with x,y coordinates in units using pandas"""
     try:
-        # Read CSV with pandas - more flexible approach
-        # Let pandas auto-detect the number of columns
+        # Read CSV with pandas - auto-detect columns
         df = pd.read_csv(csv_filename, header=None)
         
         # Check if we have at least 2 columns
@@ -25,7 +24,7 @@ def read_points_from_csv(csv_filename):
         # Convert to list of tuples
         points = list(zip(df['x'], df['y']))
         print(f"Successfully read {len(points)} points from {csv_filename}")
-        print(f"First few points: {points[:5]}")  # Show first 5 points for verification
+        print(f"Point range: x=[{df['x'].min():.2f}, {df['x'].max():.2f}], y=[{df['y'].min():.2f}, {df['y'].max():.2f}]")
         return points
         
     except FileNotFoundError:
@@ -38,7 +37,7 @@ def read_points_from_csv(csv_filename):
         print(f"Error reading CSV file: {e}")
         return []
 
-def create_grid_with_points(csv_filename, pdf_filename="grid_with_points.pdf", circle_radius=2):
+def create_grid_with_points(csv_filename, units_per_mm, pdf_filename="grid_with_points.pdf", circle_radius=2):
     # Grid dimensions
     grid_width = 275 * mm
     grid_height = 190 * mm
@@ -57,9 +56,9 @@ def create_grid_with_points(csv_filename, pdf_filename="grid_with_points.pdf", c
     # Read points from CSV using pandas
     points = read_points_from_csv(csv_filename)
     
-    # Plot points as circles
+    # Plot points as circles with unit conversion
     if points:
-        plot_points(c, points, x_offset, y_offset, circle_radius)
+        plot_points_with_units(c, points, x_offset, y_offset, grid_width, grid_height, units_per_mm, circle_radius)
     else:
         print("No points to plot")
     
@@ -70,13 +69,63 @@ def create_grid_with_points(csv_filename, pdf_filename="grid_with_points.pdf", c
     
     add_dimension_labels(c, x_offset, y_offset, grid_width, grid_height)
     
-    # Add point count information
+    # Add point count and scale information
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 10)
     c.drawString(x_offset, y_offset - 20, f"Points plotted: {len(points)}")
+    c.drawString(x_offset, y_offset - 35, f"Scale: {units_per_mm} units/mm")
     
     c.save()
     print(f"PDF created with points: {pdf_filename}")
+
+def plot_points_with_units(c, points, x_offset, y_offset, grid_width, grid_height, units_per_mm, circle_radius):
+    """Plot points as circles on the grid with unit conversion"""
+    # Convert all points to find data range
+    all_x = [point[0] for point in points]
+    all_y = [point[1] for point in points]
+    
+    min_x, max_x = min(all_x), max(all_x)
+    min_y, max_y = min(all_y), max(all_y)
+    
+    print(f"Data range in units: x=[{min_x:.2f}, {max_x:.2f}], y=[{min_y:.2f}, {max_y:.2f}]")
+    
+    # Calculate data dimensions in units
+    data_width = max_x - min_x
+    data_height = max_y - min_y
+    
+    # Calculate scale factors to fit data within grid
+    scale_x = grid_width / (data_width / units_per_mm)
+    scale_y = grid_height / (data_height / units_per_mm)
+    
+    # Use the smaller scale to maintain aspect ratio
+    scale = min(scale_x, scale_y)
+    
+    print(f"Using scale factor: {scale:.4f} mm per data unit")
+    
+    # Set point color (red circles with black border)
+    c.setFillColorRGB(1, 0, 0)  # Red fill
+    c.setStrokeColorRGB(0, 0, 0)  # Black border
+    c.setLineWidth(0.5)
+    
+    for i, (x_unit, y_unit) in enumerate(points):
+        # Convert from units to millimeters relative to data origin
+        x_mm = (x_unit - min_x) / units_per_mm
+        y_mm = (y_unit - min_y) / units_per_mm
+        
+        # Convert to PDF coordinates (centered in grid)
+        margin_x = (grid_width - (data_width / units_per_mm) * scale) / 2
+        margin_y = (grid_height - (data_height / units_per_mm) * scale) / 2
+        
+        x_pdf = x_offset + margin_x + (x_mm * scale)
+        y_pdf = y_offset + margin_y + (y_mm * scale)
+        
+        # Draw circle
+        c.circle(x_pdf, y_pdf, circle_radius, fill=1, stroke=1)
+        
+        # Optional: Add point numbers (comment out if not needed)
+        # c.setFillColorRGB(0, 0, 0)
+        # c.setFont("Helvetica", 6)
+        # c.drawString(x_pdf + 5, y_pdf + 5, f"({x_unit:.1f},{y_unit:.1f})")
 
 def draw_grid(c, x_offset, y_offset, grid_width, grid_height):
     """Draw the millimeter grid"""
@@ -108,26 +157,6 @@ def draw_grid(c, x_offset, y_offset, grid_width, grid_height):
             c.setLineWidth(0.2)
         c.line(x_offset, y_pos, x_offset + grid_width, y_pos)
 
-def plot_points(c, points, x_offset, y_offset, circle_radius):
-    """Plot points as circles on the grid"""
-    # Set point color (red circles with black border)
-    c.setFillColorRGB(1, 0, 0)  # Red fill
-    c.setStrokeColorRGB(0, 0, 0)  # Black border
-    c.setLineWidth(0.5)
-    
-    for i, (x_mm, y_mm) in enumerate(points):
-        # Convert mm coordinates to PDF coordinates
-        x_pdf = x_offset + x_mm * mm
-        y_pdf = y_offset + y_mm * mm
-        
-        # Draw circle
-        c.circle(x_pdf, y_pdf, circle_radius, fill=1, stroke=1)
-        
-        # Optional: Add point numbers (comment out if not needed)
-        # c.setFillColorRGB(0, 0, 0)
-        # c.setFont("Helvetica", 6)
-        # c.drawString(x_pdf + 5, y_pdf + 5, str(i+1))
-
 def add_dimension_labels(c, x_offset, y_offset, grid_width, grid_height):
     """Add millimeter labels around the grid"""
     c.setFillColorRGB(0, 0, 0)
@@ -143,26 +172,25 @@ def add_dimension_labels(c, x_offset, y_offset, grid_width, grid_height):
         y_pos = y_offset + y * mm
         c.drawString(x_offset - 15, y_pos - 3, str(y))
 
-# Simplified function to create a sample CSV file
-def create_sample_csv(filename="points.csv"):
-    """Create a sample CSV file with test points using pandas"""
-    # Create sample data with only 2 columns
+def create_sample_csv_with_negative(filename="points_with_negative.csv"):
+    """Create a sample CSV file with negative values"""
+    # Create sample data with negative values
     sample_data = [
-        [10, 10],
-        [50, 30],
-        [100, 80],
-        [150, 120],
-        [200, 50],
-        [250, 150],
-        [75, 25],
-        [125, 75],
-        [175, 100],
-        [225, 180]
+        [-50, -30],
+        [-25, 40],
+        [0, -10],
+        [25, 60],
+        [50, -20],
+        [75, 80],
+        [100, 10],
+        [-40, 70],
+        [90, -40],
+        [-10, -50]
     ]
     
     df = pd.DataFrame(sample_data)
     df.to_csv(filename, index=False, header=False)
-    print(f"Sample CSV created: {filename}")
+    print(f"Sample CSV with negative values created: {filename}")
     
     # Display the CSV content for verification
     print("CSV content:")
@@ -172,12 +200,14 @@ if __name__ == "__main__":
     # Install required packages: 
     # pip install reportlab pandas
     
-    # Create a sample CSV file for testing (optional)
-    create_sample_csv("sample_points.csv")
+    # Create a sample CSV file with negative values for testing
+    create_sample_csv_with_negative("sample_points_negative.csv")
     
-    # Create PDF with points from CSV using pandas
+    # Create PDF with points from CSV using unit conversion
+    # Example: 10 units per millimeter
     create_grid_with_points(
-        csv_filename="sample_points.csv",
-        pdf_filename="grid_with_points_pandas.pdf",
+        csv_filename="sample_points_negative.csv",
+        units_per_mm=10.0,  # Adjust this scale factor as needed
+        pdf_filename="grid_with_scaled_points.pdf",
         circle_radius=2
     )
