@@ -1,28 +1,42 @@
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-import csv
+import pandas as pd
 
 def read_points_from_csv(csv_filename):
-    """Read points from CSV file with x,y coordinates in mm"""
-    points = []
+    """Read points from CSV file with x,y coordinates in mm using pandas"""
     try:
-        with open(csv_filename, 'r', newline='') as csvfile:
-            csv_reader = csv.reader(csvfile)
-            for row_num, row in enumerate(csv_reader):
-                if len(row) >= 2:
-                    try:
-                        x = float(row[0].strip())
-                        y = float(row[1].strip())
-                        points.append((x, y))
-                    except ValueError:
-                        print(f"Warning: Skipping row {row_num + 1} - invalid coordinates: {row}")
+        # Read CSV with pandas - more flexible approach
+        # Let pandas auto-detect the number of columns
+        df = pd.read_csv(csv_filename, header=None)
+        
+        # Check if we have at least 2 columns
+        if df.shape[1] < 2:
+            print(f"Error: CSV file needs at least 2 columns, but has {df.shape[1]}")
+            return []
+        
+        # Use first two columns for x and y
+        df = df.iloc[:, :2]  # Take only first two columns
+        df.columns = ['x', 'y']  # Rename columns
+        
+        # Remove any rows with NaN values
+        df = df.dropna()
+        
+        # Convert to list of tuples
+        points = list(zip(df['x'], df['y']))
+        print(f"Successfully read {len(points)} points from {csv_filename}")
+        print(f"First few points: {points[:5]}")  # Show first 5 points for verification
+        return points
+        
     except FileNotFoundError:
         print(f"Error: CSV file '{csv_filename}' not found")
+        return []
+    except pd.errors.EmptyDataError:
+        print(f"Error: CSV file '{csv_filename}' is empty")
+        return []
     except Exception as e:
         print(f"Error reading CSV file: {e}")
-    
-    return points
+        return []
 
 def create_grid_with_points(csv_filename, pdf_filename="grid_with_points.pdf", circle_radius=2):
     # Grid dimensions
@@ -40,13 +54,14 @@ def create_grid_with_points(csv_filename, pdf_filename="grid_with_points.pdf", c
     # Draw the grid background first
     draw_grid(c, x_offset, y_offset, grid_width, grid_height)
     
-    # Read points from CSV
+    # Read points from CSV using pandas
     points = read_points_from_csv(csv_filename)
-    print(f"Read {len(points)} points from {csv_filename}")
     
     # Plot points as circles
     if points:
         plot_points(c, points, x_offset, y_offset, circle_radius)
+    else:
+        print("No points to plot")
     
     # Add border and labels
     c.setStrokeColorRGB(0, 0, 0)
@@ -128,10 +143,11 @@ def add_dimension_labels(c, x_offset, y_offset, grid_width, grid_height):
         y_pos = y_offset + y * mm
         c.drawString(x_offset - 15, y_pos - 3, str(y))
 
-# Example function to create a sample CSV file for testing
+# Simplified function to create a sample CSV file
 def create_sample_csv(filename="points.csv"):
-    """Create a sample CSV file with test points"""
-    sample_points = [
+    """Create a sample CSV file with test points using pandas"""
+    # Create sample data with only 2 columns
+    sample_data = [
         [10, 10],
         [50, 30],
         [100, 80],
@@ -144,19 +160,24 @@ def create_sample_csv(filename="points.csv"):
         [225, 180]
     ]
     
-    with open(filename, 'w', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        for point in sample_points:
-            csv_writer.writerow(point)
+    df = pd.DataFrame(sample_data)
+    df.to_csv(filename, index=False, header=False)
     print(f"Sample CSV created: {filename}")
+    
+    # Display the CSV content for verification
+    print("CSV content:")
+    print(df.to_string(header=False, index=False))
 
 if __name__ == "__main__":
+    # Install required packages: 
+    # pip install reportlab pandas
+    
     # Create a sample CSV file for testing (optional)
     create_sample_csv("sample_points.csv")
     
-    # Create PDF with points from CSV
+    # Create PDF with points from CSV using pandas
     create_grid_with_points(
         csv_filename="sample_points.csv",
-        pdf_filename="grid_with_points.pdf",
-        circle_radius=2  # Radius in points (adjust as needed)
+        pdf_filename="grid_with_points_pandas.pdf",
+        circle_radius=2
     )
