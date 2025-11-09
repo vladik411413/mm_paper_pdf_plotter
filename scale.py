@@ -107,7 +107,7 @@ class Axis:
         self.s = self.s_array[-1]
         return self.s
 
-class Graph:
+class Transform:
     def __init__(self,range1,lmax1,range2,lmax2):
         self.ox = Axis(range1,lmax1)
         self.oy = Axis(range2,lmax2)
@@ -128,7 +128,7 @@ class Graph:
         return self.area / (self.ox.lmax*self.oy.lmax)
 
     def __repr__(self):
-        return f'Class Graph(\n\
+        return f'Class Transform(\n\
             Ox = {self.ox},\n\
             Oy = {self.oy},\n\
             Area = {self.area},\n\
