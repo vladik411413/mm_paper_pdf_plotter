@@ -123,9 +123,9 @@ class Plot:
 def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
     """Draw millimeter grid + scaled axes and labels"""
 
-    # Tick step [units]
-    tick_step_x = tr.ox.power / 10
-    tick_step_y = tr.oy.power / 10
+    # Tick step every 10 mm
+    tick_step_x = 10*tr.ox.scale # ticks n labels every 10 mm (adjust if needed)
+    tick_step_y = 10*tr.oy.scale # ticks n labels every 10 mm (adjust if needed)
 
     page.c.setFont("Schoolbell", 7)
     page.c.setFillColorRGB(0, 0, 0)
@@ -177,7 +177,7 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             tx.mm(origin,tr).x*mm  - 1*mm ,
             corry*mm  - 6*mm , 
-            f"{tx.x}")
+            f"{tx.x:.0f}")
         tx.x += tick_step_x
 
     corrx = corrx % 10.0 + 5
@@ -191,7 +191,7 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             corrx*mm  - 6*mm , 
             ty.mm(origin,tr).y*mm  - 1*mm ,
-            f"{ty.y:g}")
+            f"{ty.y:.0f}")
         ty.y += tick_step_y
     
 
