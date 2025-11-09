@@ -67,46 +67,59 @@ class Paper:
     @property
     def top(self):
         return (self.h + self.dh) / 2
-             
-class Plot:
-    def __init__(self,csv_filename: str):
-        """Read points (x,y) from CSV file"""
-        try:
-            df = pd.read_csv(csv_filename, header=None)
-            if df.shape[1] < 2:
-                raise ValueError("CSV must have at least two columns (x, y)")
-            df = df.iloc[:, :2]
-            df.columns = ["x", "y"]
-            df = df.dropna()
-            self.points = list(zip(df["x"], df["y"]))
-            self.x = df["x"]
-            self.y = df["y"]
-            self.xmin, self.xmax = df["x"].min(), df["x"].max()
-            self.ymin, self.ymax = df["y"].min(), df["y"].max()
-            print(f"✅ Read {len(self.points)} points from {csv_filename}")
-            print(f"   X range: {xmin:.2f} → {xmax:.2f}")
-            print(f"   Y range: {ymin:.2f} → {ymax:.2f}")
 
-        except Exception as e:
-            print(f"❌ Error reading CSV: {e}")
+class Plot:
+    def __init__(self, csv_filenames):
+        """Read one or more CSV files into datasets."""
+        if isinstance(csv_filenames, str):
+            csv_filenames = [csv_filenames]
+
+        self.datasets = []  # list of (points, name)
+        self.xmin = float("inf")
+        self.xmax = float("-inf")
+        self.ymin = float("inf")
+        self.ymax = float("-inf")
+
+        for fname in csv_filenames:
+            try:
+                df = pd.read_csv(fname, header=None)
+                if df.shape[1] < 2:
+                    raise ValueError(f"{fname}: CSV must have at least two columns (x, y)")
+                df = df.iloc[:, :2]
+                df.columns = ["x", "y"]
+                df = df.dropna()
+
+                points = list(zip(df["x"], df["y"]))
+                self.datasets.append({
+                    "filename": fname,
+                    "points": points,
+                    "x": df["x"],
+                    "y": df["y"],
+                })
+
+                # Update global min/max
+                self.xmin = min(self.xmin, df["x"].min())
+                self.xmax = max(self.xmax, df["x"].max())
+                self.ymin = min(self.ymin, df["y"].min())
+                self.ymax = max(self.ymax, df["y"].max())
+
+                print(f"✅ Read {len(points)} points from {fname}")
+                print(f"   X range: {df['x'].min():.2f} → {df['x'].max():.2f}")
+                print(f"   Y range: {df['y'].min():.2f} → {df['y'].max():.2f}")
+
+            except Exception as e:
+                print(f"❌ Error reading {fname}: {e}")
+
+        if not self.datasets:
+            raise ValueError("No valid datasets loaded")
 
     @property
     def range(self):
-        return Point(self.xmax-self.xmin,self.ymax-self.ymin,SType.UNITS)
-
-    
+        return Point(self.xmax - self.xmin, self.ymax - self.ymin, SType.UNITS)
 
 
 def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
     """Draw millimeter grid + scaled axes and labels"""
-    # === Millimeter grid ===
-    '''
-    page.c.saveState()
-
-
-
-    page.c.restoreState()
-    '''
 
     # Tick step [units]
     tick_step_x = tr.ox.power / 10
@@ -189,62 +202,53 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
 
 
 def plot_points(page, origin, plot, tr):
-    """Plot data points"""
-    page.c.setFillColorRGB(1, 0, 0)
-    for x, y in plot.points:
-        point = Point(x,y,SType.UNITS)
-        page.c.circle(point.mm(origin,tr).x*mm, point.mm(origin,tr).y*mm, 1.5, fill=1, stroke=0)
+    """Plot all datasets with different colors."""
+    colors = [
+        (1, 0, 0), (0, 0, 1), (0, 0.6, 0),
+        (0.8, 0.4, 0), (0.5, 0, 0.5), (0, 0.7, 0.7)
+    ]
 
+    for i, ds in enumerate(plot.datasets):
+        r, g, b = colors[i % len(colors)]
+        page.c.setFillColorRGB(r, g, b)
+        for x, y in ds["points"]:
+            point = Point(x, y, SType.UNITS)
+            page.c.circle(point.mm(origin, tr).x * mm, point.mm(origin, tr).y * mm, 1.5, fill=1, stroke=0)
 
-def create_pdf_from_csv(csv_filename, pdf_filename="auto_scaled_plot.pdf"):
+        # Optional legend text
+        page.c.setFont("Helvetica", 7)
+        page.c.setFillColorRGB(r, g, b)
+        page.c.drawString(page.left * mm + 5*mm, (page.top - 5 - i*5) * mm, ds["filename"])
+
+def create_pdf_from_csv(csv_filenames, pdf_filename="multi_plot.pdf"):
+    """Create a PDF with all CSVs plotted together."""
+    if isinstance(csv_filenames, str):
+        csv_filenames = [csv_filenames]
 
     page = Paper(A4[1], A4[0], 275 * mm, 190 * mm, pdf_filename)
+    plot = Plot(csv_filenames)
 
-    plot = Plot(csv_filename)
-
-    if not plot.points:
-        return
-
-    # === Determine scale using Transform ===
+    # Determine scale based on all datasets
     tr = Transform(plot.range.x, page.dw, plot.range.y, page.dh)
     print("📏 Scale computed by Transform:")
     print(tr)
 
     # Origin (mm)
     origin = Pair(
-        (page.center.x- (plot.xmax+plot.xmin)/(2*tr.ox.scale)), 
-        (page.center.y- (plot.ymax+plot.ymin)/(2*tr.oy.scale)))
+        (page.center.x - (plot.xmax + plot.xmin) / (2 * tr.ox.scale)),
+        (page.center.y - (plot.ymax + plot.ymin) / (2 * tr.oy.scale)),
+    )
 
     # Draw background grid and axes
     draw_scaled_grid(page, origin, plot, tr)
 
-    # Plot data points
+    # Plot all datasets
     plot_points(page, origin, plot, tr)
 
     page.c.save()
     print(f"✅ PDF created: {pdf_filename}")
 
-'''
-# === Sample test ===
-def create_sample_csv(filename="sample_points.csv"):
-    sample = [
-        [17, 0],
-        [20, 200],
-        [22, 400],
-        [24, 600],
-        [26, 800],
-        [28, 900],
-        [30, 950],
-        [32, 980],
-        [33, 1000],
-        [34, 1080],
-        [35, 1091],
-    ]
-    df = pd.DataFrame(sample)
-    df.to_csv(filename, index=False, header=False)
-    print(f"Sample CSV created: {filename}")
-'''
 
 if __name__ == "__main__":
-    #create_sample_csv("sample_points.csv")
-    create_pdf_from_csv("sample_points.csv", "auto_scaled_plot.pdf")
+    csvs = ["./zhenya_lab_1.csv", "./zhenya_lab_2.csv", "./zhenya_lab_3.csv"]
+    create_pdf_from_csv(csvs, "multi_plot.pdf")
