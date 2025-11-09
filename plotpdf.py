@@ -1,6 +1,8 @@
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import pandas as pd
 from scale import Transform
 from enum import Enum
@@ -125,10 +127,10 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
     tick_step_x = tr.ox.power / 10
     tick_step_y = tr.oy.power / 10
 
-    page.c.setFont("Helvetica", 6)
+    page.c.setFont("Schoolbell", 7)
     page.c.setFillColorRGB(0, 0, 0)
 
-    # X ticks and labels
+    # Grid X
     tx0 = Point(plot.xmin - (plot.xmin % tick_step_x),0,SType.UNITS)
     tx=tx0
 
@@ -146,7 +148,7 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.line(x_pos*mm, 0*mm, x_pos*mm, page.h*mm)
 
 
-    # Y ticks and labels
+    # Grid Y
     ty0 = Point(plot.ymin - (plot.ymin % tick_step_y),0,SType.UNITS)
     ty=ty0
     while ty.mm(origin,tr).y > page.bottom + 10:
@@ -214,13 +216,14 @@ def plot_points(page, origin, plot, tr):
         for x, y in ds["points"]:
             point = Point(x, y, SType.UNITS)
             page.c.circle(point.mm(origin, tr).x * mm, point.mm(origin, tr).y * mm, 1.5, fill=1, stroke=0)
-
-        # Optional legend text
-        page.c.setFont("Helvetica", 7)
-        page.c.setFillColorRGB(r, g, b)
-        page.c.drawString(page.left * mm + 5*mm, (page.top - 5 - i*5) * mm, ds["filename"])
+        # ✅ Print dataset info in terminal instead of drawing it on PDF
+        print(f"[{i+1}] {ds['filename']} → Color RGB({r:.2f}, {g:.2f}, {b:.2f}), {len(ds['points'])} points")
 
 def create_pdf_from_csv(csv_filenames, pdf_filename="multi_plot.pdf"):
+
+    # Register your custom font
+    pdfmetrics.registerFont(TTFont("Schoolbell", "Schoolbell-Regular.ttf"))
+
     """Create a PDF with all CSVs plotted together."""
     if isinstance(csv_filenames, str):
         csv_filenames = [csv_filenames]
