@@ -120,7 +120,7 @@ class Plot:
         return Point(self.xmax - self.xmin, self.ymax - self.ymin, SType.UNITS)
 
 
-def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
+def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform, draw_ticks_and_labels = True):
     """Draw millimeter grid + scaled axes and labels"""
 
     # Tick step every 10 mm
@@ -164,10 +164,22 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
             page.c.setLineWidth(0.25)
         page.c.line(0*mm, y_pos*mm, page.w*mm, y_pos*mm)
 
+    corry = corry % 10.0 + 10
+    corrx = corrx % 10.0 + 5
+
+    # Axes lines
+    page.c.setStrokeColorRGB(0, 0, 0)
+    page.c.setLineWidth(0.8)
+    page.c.line(corrx*mm, corry*mm, corrx*mm, page.top*mm)
+    page.c.line(corrx*mm, corry*mm, page.right*mm, corry*mm)
+
+    if(not draw_ticks_and_labels):
+        return
+
     page.c.setLineWidth(0.8)
     page.c.setStrokeColorRGB(0, 0, 0)
 
-    corry = corry % 10.0 + 10
+
     while tx.mm(origin,tr).x < page.right - 10:
         page.c.line(
             tx.mm(origin,tr).x*mm, 
@@ -177,10 +189,9 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             tx.mm(origin,tr).x*mm  - 1*mm ,
             corry*mm  - 6*mm , 
-            f"{tx.x:g}")
+            f"{tx.x/tr.ox.power:g}")
         tx.x += tick_step_x
 
-    corrx = corrx % 10.0 + 5
     while ty.mm(origin,tr).y < page.top - 10:
         page.c.line(
             corrx*mm  - 1*mm ,
@@ -191,16 +202,28 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             corrx*mm  - 6*mm , 
             ty.mm(origin,tr).y*mm  - 1*mm ,
-            f"{ty.y:g}")
+            f"{ty.y/tr.oy.power:g}")
         ty.y += tick_step_y
-    
+
+    page.c.setFont("Schoolbell", 9)
+
+    def superscript(n: int) -> str:
+        """Return a Unicode superscript string for an integer n."""
+        superscripts = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹-")
+        return str(int(n)).translate(superscripts)
+
+    from math import log10
+    page.c.drawString(
+    page.right*mm + 2*mm,
+    corry*mm  + 3*mm , 
+    f"10{superscript(log10(tr.ox.power))}") 
+
+    page.c.drawString(
+    corrx*mm  + 6*mm , 
+    page.top*mm - 2*mm ,
+    f"10{superscript(log10(tr.oy.power))}")
 
 
-    # Axes lines
-    page.c.setStrokeColorRGB(0, 0, 0)
-    page.c.setLineWidth(0.8)
-    page.c.line(corrx*mm, corry*mm, corrx*mm, page.top*mm)
-    page.c.line(corrx*mm, corry*mm, page.right*mm, corry*mm)
 
 
 def plot_points(page, origin, plot, tr):
