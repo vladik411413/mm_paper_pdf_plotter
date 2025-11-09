@@ -177,7 +177,7 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             tx.mm(origin,tr).x*mm  - 1*mm ,
             corry*mm  - 6*mm , 
-            f"{tx.x:.0f}")
+            f"{tx.x:g}")
         tx.x += tick_step_x
 
     corrx = corrx % 10.0 + 5
@@ -191,7 +191,7 @@ def draw_scaled_grid(page: Paper, origin: Pair,  plot: Plot, tr: Transform):
         page.c.drawString(
             corrx*mm  - 6*mm , 
             ty.mm(origin,tr).y*mm  - 1*mm ,
-            f"{ty.y:.0f}")
+            f"{ty.y:g}")
         ty.y += tick_step_y
     
 
